@@ -1,0 +1,119 @@
+local UIS,Players,LP,RS,W = game:GetService("UserInputService"),game:GetService("Players"),game.Players.LocalPlayer,game:GetService("RunService"),game:GetService("Workspace");
+local BN="SoccerWellingtorato"; -- Nome da bola
+local TK_KEY=Enum.KeyCode.F;    -- TECLA MUDADA PARA F
+local TK_GAMEPAD=Enum.KeyCode.ButtonX; -- Botão Quadrado/X do controle
+local isAttached=false; 
+local Conn=nil;
+local AttachedBall=nil; -- Variável para armazenar a referência da bola
+local NOC_NAME = "Atravessar Fantasma"; 
+
+local function findBall()
+    local nearest,minD,HRP = nil,math.huge,LP.Character and LP.Character:FindFirstChild("HumanoidRootPart");
+    if not HRP then return nil end
+    for _,desc in ipairs(W:GetDescendants()) do
+        if desc:IsA("BasePart") and desc.Name == BN then
+            local distance = (HRP.Position-desc.Position).Magnitude;
+            if distance < minD and distance < 50 then minD=distance; nearest=desc end
+        end
+    end
+    return nearest
+end
+
+local function applyNoCollision(Part1, Part2)
+    local noc = Instance.new("NoCollisionConstraint")
+    noc.Name = NOC_NAME
+    noc.Part0 = Part1
+    noc.Part1 = Part2
+    noc.Parent = Part1
+end
+
+local function removeNoCollision(Part1)
+    local noc = Part1:FindFirstChild(NOC_NAME)
+    if noc then noc:Destroy() end
+end
+
+local function startMove(B,H)
+    -- O terceiro valor (Z) foi alterado de -2.5 para -2.3.
+    local O = CFrame.new(0,-1.5,-2.3); -- ⬅️ AQUI: Bola movida para Z = -2.3
+    local rS = 20; 
+    local a = 0;
+    
+    B.CanCollide=false; 
+    if B:IsA("BasePart") then B.Massless=true end
+    B.Transparency = 0 
+    
+    applyNoCollision(H, B)
+    B.Parent = W 
+    
+    AttachedBall = B;
+    
+    Conn=RS.Heartbeat:Connect(function(dT)
+        if not LP.Character or not H or not AttachedBall or not AttachedBall:IsA("BasePart") then 
+            if Conn then Conn:Disconnect() end; 
+            isAttached=false; 
+            removeNoCollision(H); 
+            AttachedBall = nil;
+            return 
+        end
+        a=a+(dT*rS);
+        
+        local rot=CFrame.Angles(-a,0,0);
+        AttachedBall.CFrame = (H.CFrame*O)*rot;
+    end);
+    isAttached=true; 
+    print("✅ MODO ATIVADO (Atravessar Fantasma IB - Theus): Bola Presa.")
+end
+
+local function stopMove()
+    if Conn then Conn:Disconnect(); Conn=nil end
+    
+    local H = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+    if H then removeNoCollision(H) end
+    
+    local B = AttachedBall; 
+    
+    local success, err = pcall(function()
+        if B and B:IsA("BasePart") then
+            B.CanCollide = true
+            B.Massless = false
+            B.Transparency = 0 
+            
+            B.Parent = W 
+            B.AssemblyLinearVelocity = Vector3.new(0,0,0)
+            B.AssemblyAngularVelocity = Vector3.new(0,0,0)
+        end
+    end)
+    
+    if not success then
+        warn("Aviso: Erro ao redefinir a bola na desativação: " .. tostring(err))
+    end
+    
+    AttachedBall = nil;
+    isAttached=false; 
+    print("📴 MODO DESATIVADO (Atravessar Fantasma IB - Theus): Bola Solta.")
+end
+
+local function toggle()
+    local H=LP.Character and LP.Character:FindFirstChild("HumanoidRootPart");
+    if not H then warn("HRP not found."); return end
+    
+    if isAttached then
+        stopMove();
+    else
+        local B=findBall();
+        if B then 
+            startMove(B,H) 
+        else 
+            warn("Bola não encontrada para iniciar o movimento.") 
+        end
+    end
+end
+
+-- Conexão para Tecla F (Teclado) e Botão Quadrado/X (Controle)
+UIS.InputBegan:Connect(function(i,gpe) 
+    if (i.KeyCode == TK_KEY or i.KeyCode == TK_GAMEPAD) and i.UserInputState == Enum.UserInputState.Begin and not gpe then 
+        toggle() 
+    end 
+end);
+
+print("Script Carregado (Atravessar Fantasma IB - Theus). Pressione F ou o botão Quadrado/X do controle para alternar.")
